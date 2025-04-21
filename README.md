@@ -1,2 +1,2 @@
 # preview-images-huggingface
-Preview images from a Hugginface repo.
+Preview images from a Huggingface repo.
