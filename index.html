@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>HiDream‑I1 Artists – Image Gallery</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        background: #f6f6f6;
+        padding: 24px;
+      }
+      h1 {
+        margin-bottom: 18px;
+        text-align: center;
+        font-weight: 600;
+      }
+      #status {
+        font-size: 18px;
+        text-align: center;
+        margin-top: 40px;
+        color: #444;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      td {
+        background: #fff;
+        border: 1px solid #ddd;
+        padding: 12px;
+        text-align: center;
+      }
+      img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 0 auto 8px;
+        border-radius: 4px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      }
+      figcaption {
+        font-size: 14px;
+        color: #555;
+        word-break: break-word;
+      }
+      @media (max-width: 700px) {
+        td {
+          padding: 6px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>HiDream‑I1 Artists – Image Repository</h1>
+    <div id="status">Loading images…</div>
+    <table id="gallery"></table>
+
+    <script>
+      (async () => {
+        const repo = "newsletter/HiDream-I1-Artists";
+
+        /* ✅  CORRECT endpoints  */
+        const infoURL = `https://huggingface.co/api/datasets/${repo}?expand=siblings`;
+        const treeURL = `https://huggingface.co/api/datasets/${repo}/tree/main?recursive=true`;
+
+        const rawURL = (file) =>
+          `https://huggingface.co/datasets/${repo}/resolve/main/${file
+            .split("/")
+            .map(encodeURIComponent)
+            .join("/")}`;
+
+        const gallery = document.getElementById("gallery");
+        const COLS = 4;
+
+        function addRows(files) {
+          let row;
+          files.forEach((f, i) => {
+            if (i % COLS === 0) row = gallery.insertRow(-1);
+            row.insertCell(-1).innerHTML = `<figure><img src="${rawURL(
+              f
+            )}" alt="${f}"><figcaption>${f}</figcaption></figure>`;
+          });
+          /* pad last row so borders stay even */
+          while (row && row.cells.length < COLS) row.insertCell(-1);
+        }
+
+        async function fetchList(url) {
+          const r = await fetch(url);
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          const json = await r.json();
+          const items = Array.isArray(json) ? json : json.siblings || [];
+          return items
+            .map((item) => item.rfilename || item.path || item) // normalise
+            .filter((name) => /\.(png|jpe?g|gif|webp)$/i.test(name)); // images only
+        }
+
+        try {
+          let files;
+          try {
+            files = await fetchList(infoURL);
+          } catch {
+            files = await fetchList(treeURL);
+          }
+
+          files.sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+          addRows(files);
+          document.getElementById("status").remove();
+        } catch (err) {
+          document.getElementById("status").textContent =
+            "❌ Failed to load images: " + err.message;
+          console.error(err);
+        }
+      })();
+    </script>
+  </body>
+</html>
