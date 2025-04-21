@@ -8,7 +8,7 @@
       :root {
         --cols: 4;
       }
-      @media (max-width: 1024px) {
+      @media (max-width: 700px) {
         :root {
           --cols: 2;
         }
@@ -230,7 +230,7 @@
         }
 
         /* ------------- rate‑limit logic ------------- */
-        const RATE_LIMIT = 200; // requests per WINDOW_MS
+        const RATE_LIMIT = 400; // requests per WINDOW_MS
         const WINDOW_MS = 60_000; // 1‑minute rolling window
         const stamps = []; // timestamps of issued requests
         const queue = []; // <img> elements waiting
