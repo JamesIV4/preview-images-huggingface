@@ -2,17 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Ensure the layout scales correctly on phones -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>HiDream‑I1 Artists – Rate‑Limited Lazy Gallery + Zoom</title>
 
     <style>
       :root {
-        --cols: 4;
+        --cols: 4; /* desktop default */
       }
-      @media (max-width: 700px) {
+      /* Phone / small‑tablet breakpoint (768 px and under after viewport scaling) */
+      @media (max-width: 768px) {
         :root {
-          --cols: 2;
+          --cols: 2; /* two images per row on small screens */
         }
       }
+
       * {
         box-sizing: border-box;
         margin: 0;
@@ -120,10 +124,13 @@
         color: #fff;
         border: none;
         border-radius: 6px;
-        padding: 8px 14px;
-        font-size: 18px;
+        padding: 10px 18px; /* larger touch target */
+        font-size: 20px; /* bigger glyphs */
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
         cursor: pointer;
+        line-height: 1;
+        min-width: 48px;
+        min-height: 48px; /* WCAG‑recommended size for touch */
       }
       #zoomControls button:hover {
         background: #024ea4;
@@ -137,13 +144,29 @@
         background: #0366d6;
         color: #fff;
         text-decoration: none;
-        padding: 8px 12px;
+        padding: 10px 16px; /* larger touch target */
         border-radius: 6px;
-        font-size: 14px;
+        font-size: 16px;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        min-width: 48px;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
       #toTop:hover {
         background: #024ea4;
+      }
+
+      /* Increase button size again on very small screens */
+      @media (max-width: 480px) {
+        #zoomControls button {
+          padding: 12px 20px;
+          font-size: 22px;
+        }
+        #toTop {
+          font-size: 18px;
+        }
       }
 
       /* rate‑limit notice */
