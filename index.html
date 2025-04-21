@@ -2,20 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>HiDream‑I1 Artists – Responsive Lazy Gallery + Zoom</title>
+    <title>HiDream‑I1 Artists – Rate‑Limited Lazy Gallery + Zoom</title>
 
     <style>
-      /* ─────────── variables & responsiveness ─────────── */
       :root {
         --cols: 4;
-      } /* desktop default */
+      }
       @media (max-width: 700px) {
         :root {
           --cols: 2;
         }
-      } /* phone default */
-
-      /* ─────────── basic layout ─────────── */
+      }
       * {
         box-sizing: border-box;
         margin: 0;
@@ -32,7 +29,7 @@
         margin-bottom: 12px;
       }
 
-      /* A‑Z jump bar */
+      /* A‑Z bar */
       #az {
         display: flex;
         justify-content: center;
@@ -63,7 +60,6 @@
         cursor: not-allowed;
       }
 
-      /* status */
       #status {
         font-size: 18px;
         text-align: center;
@@ -71,7 +67,7 @@
         color: #444;
       }
 
-      /* ─────────── gallery grid ─────────── */
+      /* gallery */
       #gallery {
         display: grid;
         gap: 12px;
@@ -109,7 +105,7 @@
         width: 0;
       }
 
-      /* ─────────── fixed controls ─────────── */
+      /* controls */
       #zoomControls {
         position: fixed;
         left: 16px;
@@ -149,6 +145,24 @@
       #toTop:hover {
         background: #024ea4;
       }
+
+      /* rate‑limit notice */
+      #rateNotice {
+        position: fixed;
+        left: 50%;
+        bottom: 80px;
+        transform: translateX(-50%);
+        background: #ffc107;
+        color: #333;
+        padding: 8px 14px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        z-index: 998;
+        display: none;
+        white-space: nowrap;
+      }
     </style>
   </head>
   <body>
@@ -169,8 +183,12 @@
     <!-- Back‑to‑top link -->
     <a href="#top" id="toTop">Back to top</a>
 
+    <!-- rate‑limit notice -->
+    <div id="rateNotice">Pausing image loads…</div>
+
     <script>
       (async () => {
+        /* ------------- dataset & helpers ------------- */
         const repo = "newsletter/HiDream-I1-Artists";
         const info = `https://huggingface.co/api/datasets/${repo}?expand=siblings`;
         const tree = `https://huggingface.co/api/datasets/${repo}/tree/main?recursive=true`;
@@ -180,7 +198,10 @@
             .map(encodeURIComponent)
             .join("/")}`;
 
-        /* ---------- fetch image list ---------- */
+        const azBar = document.getElementById("az");
+        const grid = document.getElementById("gallery");
+        const notice = document.getElementById("rateNotice");
+
         async function list(url) {
           const r = await fetch(url);
           if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
@@ -191,11 +212,8 @@
             .filter((n) => /\.(png|jpe?g|gif|webp)$/i.test(n));
         }
 
-        const az = document.getElementById("az");
-        const grid = document.getElementById("gallery");
-
         function buildAZ(set) {
-          az.innerHTML = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
+          azBar.innerHTML = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
             .map((L) =>
               set.has(L) ? `<a href="#${L}">${L}</a>` : `<span>${L}</span>`
             )
@@ -211,6 +229,58 @@
           grid.appendChild(fig);
         }
 
+        /* ------------- rate‑limit logic ------------- */
+        const RATE_LIMIT = 200; // requests per WINDOW_MS
+        const WINDOW_MS = 60_000; // 1‑minute rolling window
+        const stamps = []; // timestamps of issued requests
+        const queue = []; // <img> elements waiting
+
+        function clean() {
+          const cut = Date.now() - WINDOW_MS;
+          while (stamps.length && stamps[0] < cut) stamps.shift();
+        }
+
+        function updateNotice() {
+          clean();
+          if (queue.length || stamps.length >= RATE_LIMIT) {
+            const msLeft =
+              stamps.length >= RATE_LIMIT
+                ? WINDOW_MS - (Date.now() - stamps[0])
+                : 0;
+            const secs = Math.ceil(msLeft / 1000);
+            notice.textContent = `Pausing image loads to avoid rate limit… (${secs}s)`;
+            notice.style.display = "block";
+          } else {
+            notice.style.display = "none";
+          }
+        }
+
+        function pushRequest(img) {
+          stamps.push(Date.now());
+          img.src = img.dataset.src;
+          img.classList.remove("lazy");
+        }
+
+        function tryLoad(img) {
+          clean();
+          if (stamps.length < RATE_LIMIT) {
+            pushRequest(img);
+          } else {
+            queue.push(img);
+            updateNotice();
+          }
+        }
+
+        /* process queue every second */
+        setInterval(() => {
+          clean();
+          while (queue.length && stamps.length < RATE_LIMIT) {
+            pushRequest(queue.shift());
+          }
+          updateNotice();
+        }, 1000);
+
+        /* ------------- build gallery ------------- */
         try {
           let files;
           try {
@@ -237,15 +307,13 @@
 
           document.getElementById("status").remove();
 
-          /* ---------- lazy‑loader ---------- */
           const io = new IntersectionObserver(
-            (entries, obs) => {
-              entries.forEach((e) => {
+            (ents, obs) => {
+              ents.forEach((e) => {
                 if (e.isIntersecting) {
                   const img = e.target;
-                  img.src = img.dataset.src;
-                  img.classList.remove("lazy");
                   obs.unobserve(img);
+                  tryLoad(img);
                 }
               });
             },
@@ -260,7 +328,7 @@
           console.error(err);
         }
 
-        /* ---------- zoom controls (behavior swapped) ---------- */
+        /* ------------- zoom controls ------------- */
         const root = document.documentElement;
         const MIN = 1,
           MAX = 10;
@@ -268,13 +336,10 @@
           parseInt(getComputedStyle(root).getPropertyValue("--cols")) || 4;
         const setCols = (n) => root.style.setProperty("--cols", n);
 
-        // “＋”  → zoom IN  (fewer columns, larger images)
         document.getElementById("zoomIn").onclick = () => {
           const c = getCols();
           if (c > MIN) setCols(c - 1);
         };
-
-        // “−”  → zoom OUT (more columns, smaller images)
         document.getElementById("zoomOut").onclick = () => {
           const c = getCols();
           if (c < MAX) setCols(c + 1);
