@@ -2,8 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>HiDream‑I1 Artists – Image Gallery</title>
+    <title>HiDream‑I1 Artists – Lazy Gallery (A‑Z)</title>
     <style>
+      /* --- layout & gallery --- */
       * {
         box-sizing: border-box;
         margin: 0;
@@ -15,10 +16,40 @@
         padding: 24px;
       }
       h1 {
-        margin-bottom: 18px;
         text-align: center;
         font-weight: 600;
+        margin-bottom: 12px;
       }
+      #az {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 16px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      #az a,
+      #az span {
+        padding: 4px 6px;
+        border-radius: 4px;
+        user-select: none;
+      }
+      #az a {
+        color: #0366d6;
+        text-decoration: none;
+        border: 1px solid #0366d6;
+      }
+      #az a:hover {
+        background: #0366d6;
+        color: #fff;
+      }
+      #az span {
+        color: #aaa;
+        border: 1px solid #ddd;
+        cursor: not-allowed;
+      }
+
       #status {
         font-size: 18px;
         text-align: center;
@@ -35,68 +66,117 @@
         padding: 12px;
         text-align: center;
       }
+
+      figure {
+        margin: 0;
+      }
       img {
-        max-width: 100%;
-        height: auto;
         display: block;
-        margin: 0 auto 8px;
+        width: 100%;
+        height: auto;
         border-radius: 4px;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      }
+      img.lazy {
+        background: #e0e0e0;
+        aspect-ratio: 1/1;
+        filter: blur(4px);
+        transition: filter 0.3s;
       }
       figcaption {
         font-size: 14px;
         color: #555;
         word-break: break-word;
+        margin-top: 6px;
       }
+
       @media (max-width: 700px) {
         td {
           padding: 6px;
         }
       }
+
+      /* --- Back‑to‑top button --- */
+      #toTop {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        background: #0366d6;
+        color: #fff;
+        text-decoration: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        z-index: 999;
+      }
+      #toTop:hover {
+        background: #024ea4;
+      }
     </style>
   </head>
   <body>
-    <h1>HiDream‑I1 Artists – Image Repository</h1>
-    <div id="status">Loading images…</div>
+    <h1 id="top">HiDream‑I1 Artists – Image Repository</h1>
+    <nav id="az">A‑Z loading…</nav>
+    <div id="status">Fetching image list…</div>
     <table id="gallery"></table>
+
+    <!-- Back‑to‑top link -->
+    <a href="#top" id="toTop">Back to top</a>
 
     <script>
       (async () => {
         const repo = "newsletter/HiDream-I1-Artists";
-
-        /* ✅  CORRECT endpoints  */
         const infoURL = `https://huggingface.co/api/datasets/${repo}?expand=siblings`;
         const treeURL = `https://huggingface.co/api/datasets/${repo}/tree/main?recursive=true`;
-
-        const rawURL = (file) =>
-          `https://huggingface.co/datasets/${repo}/resolve/main/${file
+        const raw = (f) =>
+          `https://huggingface.co/datasets/${repo}/resolve/main/${f
             .split("/")
             .map(encodeURIComponent)
             .join("/")}`;
 
-        const gallery = document.getElementById("gallery");
         const COLS = 4;
+        const gallery = document.getElementById("gallery");
+        const azBar = document.getElementById("az");
 
-        function addRows(files) {
-          let row;
-          files.forEach((f, i) => {
-            if (i % COLS === 0) row = gallery.insertRow(-1);
-            row.insertCell(-1).innerHTML = `<figure><img src="${rawURL(
-              f
-            )}" alt="${f}"><figcaption>${f}</figcaption></figure>`;
-          });
-          /* pad last row so borders stay even */
-          while (row && row.cells.length < COLS) row.insertCell(-1);
-        }
-
+        /* ---------- helpers ---------- */
         async function fetchList(url) {
           const r = await fetch(url);
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          const json = await r.json();
-          const items = Array.isArray(json) ? json : json.siblings || [];
-          return items
-            .map((item) => item.rfilename || item.path || item) // normalise
-            .filter((name) => /\.(png|jpe?g|gif|webp)$/i.test(name)); // images only
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          const j = await r.json();
+          const list = Array.isArray(j) ? j : j.siblings || [];
+          return list
+            .map((it) => it.rfilename || it.path || it)
+            .filter((n) => /\.(png|jpe?g|gif|webp)$/i.test(n));
+        }
+
+        function buildAZ(letters) {
+          azBar.innerHTML = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
+            .map((L) =>
+              letters.has(L) ? `<a href="#${L}">${L}</a>` : `<span>${L}</span>`
+            )
+            .join("");
+        }
+
+        function buildTable(files) {
+          let row,
+            cur = "";
+          files.forEach((f) => {
+            const first = f[0].toUpperCase();
+            if (first !== cur) {
+              cur = first;
+              row = gallery.insertRow(-1);
+              row.id = cur;
+            }
+            if (row.cells.length === COLS) row = gallery.insertRow(-1);
+            row.insertCell(-1).innerHTML = `
+        <figure>
+          <img class="lazy" data-src="${raw(f)}" alt="${f}" loading="lazy"
+               src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==">
+          <figcaption>${f}</figcaption>
+        </figure>`;
+          });
+          while (row && row.cells.length < COLS) row.insertCell(-1);
         }
 
         try {
@@ -106,13 +186,32 @@
           } catch {
             files = await fetchList(treeURL);
           }
-
           files.sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
-          addRows(files);
+
+          buildAZ(new Set(files.map((f) => f[0].toUpperCase())));
+          buildTable(files);
           document.getElementById("status").remove();
+
+          /* lazy‑load */
+          const io = new IntersectionObserver(
+            (es, o) => {
+              es.forEach((e) => {
+                if (e.isIntersecting) {
+                  const img = e.target;
+                  img.src = img.dataset.src;
+                  img.classList.remove("lazy");
+                  o.unobserve(img);
+                }
+              });
+            },
+            { rootMargin: "200px" }
+          );
+          document
+            .querySelectorAll("img.lazy")
+            .forEach((img) => io.observe(img));
         } catch (err) {
           document.getElementById("status").textContent =
-            "❌ Failed to load images: " + err.message;
+            "❌ Failed: " + err.message;
           console.error(err);
         }
       })();
