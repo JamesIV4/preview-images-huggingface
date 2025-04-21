@@ -231,7 +231,7 @@
 
         /* ------------- rate‑limit logic ------------- */
         const RATE_LIMIT = 400; // requests per WINDOW_MS
-        const WINDOW_MS = 60_000; // 1‑minute rolling window
+        const WINDOW_MS = 120_000; // 2‑minute rolling window
         const stamps = []; // timestamps of issued requests
         const queue = []; // <img> elements waiting
 
